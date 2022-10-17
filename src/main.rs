@@ -6,6 +6,7 @@ use std::{
 use core::pin::Pin;
 use futures::{channel::mpsc, stream::BoxStream, SinkExt, Stream, StreamExt};
 use pin_project_lite::pin_project;
+use rx_parity::many;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
@@ -28,14 +29,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
         }
     });
 
-    //rx1.chain(other)
-    //rx1.zip(other)
+    let streams = vec![rx1, rx2];
+    let combined = many::combine_latest(streams);
 
-    let mut combined = combine_latest(rx1, rx2).boxed();
+    println!("{combined:?}");
 
-    while let Some(t) = combined.next().await {
-        println!("{t:?}");
-    }
+    // //rx1.chain(other)
+    // //rx1.zip(other)
+
+    // let mut combined = combine_latest(rx1, rx2).boxed();
+
+    // while let Some(t) = combined.next().await {
+    //     println!("{t:?}");
+    // }
 
     Ok(())
 }
@@ -114,18 +120,6 @@ where
     ) -> std::task::Poll<Option<Self::Item>> {
         let mut this = self.project();
 
-        // let first_result = this
-        //     .first
-        //     .as_mut()
-        //     .as_pin_mut()
-        //     .map(|first| first.poll_next(cx));
-
-        // let second_result = this
-        //     .second
-        //     .as_mut()
-        //     .as_pin_mut()
-        //     .map(|second| second.poll_next(cx));
-
         let mut at_least_one_ready_and_valid = false;
 
         if let Some(first) = this.first.as_mut().as_pin_mut() {
@@ -173,13 +167,5 @@ where
         }
 
         return std::task::Poll::Pending;
-
-        // } else if let (Some(value1), Some(value2)) = (this.first_latest, this.second_latest) {
-        //     // One of the streams returned Ready, and both values have been seen
-        //     return std::task::Poll::Ready(Some((value1.clone(), value2.clone())));
-        // } else {
-        //     // TODO: THIS IS FAULTY LOGIC! What about the case where one stream returns None and the other is pending...? We should terminate...?
-        //     return std::task::Poll::Pending;
-        // }
     }
 }
