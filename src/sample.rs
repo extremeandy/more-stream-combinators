@@ -11,17 +11,14 @@ use std::pin::Pin;
 use std::task::{self, Poll};
 use tokio::time::{Duration, Instant, Sleep};
 
-pub(super) fn sample<T>(duration: Duration, stream: T) -> Sample<T>
+pub(super) fn sample<T, S>(stream: T, sampler: S) -> Sample<T, S>
 where
     T: Stream,
 {
     Sample {
-        delay: tokio::time::sleep_until(Instant::now() + duration),
-        duration,
-        has_delayed: true,
         stream,
-        last_value: None,
-        finished: false,
+        sampler,
+        value: None,
     }
 }
 
@@ -30,30 +27,20 @@ pin_project! {
     /// implement `Unpin` you can pin your sample like this: `Box::pin(your_sample)`.
     #[derive(Debug)]
     #[must_use = "streams do nothing unless polled"]
-    pub struct Sample<T: Stream> {
-        #[pin]
-        delay: Sleep,
-
-        duration: Duration,
-
-        // Set to true when `delay` has returned ready, but `stream` hasn't.
-        has_delayed: bool,
-
+    pub struct Sample<T: Stream, S> {
         // The stream to sample
         #[pin]
         stream: T,
 
-        last_value: Option<T::Item>,
+        #[pin]
+        sampler: S,
 
-        // Set to true when `stream` completed in the last call to `poll_next`
-        // but we yielded `Poll::Ready(Some(_))` because `stream` yielded `Some`
-        // over the sampling duration
-        finished: bool
+        value: Option<T::Item>
     }
 }
 
 // XXX: are these safe if `T: !Unpin`?
-impl<T: Stream + Unpin> Sample<T> {
+impl<T: Stream + Unpin, S> Sample<T, S> {
     /// Acquires a reference to the underlying stream that this combinator is
     /// pulling from.
     pub fn get_ref(&self) -> &T {
@@ -78,50 +65,25 @@ impl<T: Stream + Unpin> Sample<T> {
     }
 }
 
-impl<T: Stream> Stream for Sample<T> {
-    type Item = T::Item;
+impl<T: Stream, S: Stream> Stream for Sample<T, S> {
+    type Item = Option<T::Item>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut me = self.project();
+        let this = self.project();
 
-        if *me.finished {
-            return Poll::Ready(None);
-        }
-
-        let dur = *me.duration;
-
-        if !*me.has_delayed && !dur.is_zero() {
-            ready!(me.delay.as_mut().poll(cx));
-            *me.has_delayed = true;
-        }
-
-        let mut value = ready!(me.stream.poll_next_unpin(cx));
-
-        if value.is_some() {
-            if !dur.is_zero() {
-                let next_deadline = me.delay.deadline() + dur;
-                me.delay.reset(next_deadline);
-
-                while let Poll::Ready(inner) = me.stream.poll_next_unpin(cx) {
-                    //println!("Skip!");
-                    match inner {
-                        Some(inner) => value = Some(inner),
-                        None => *me.finished = true,
-                    }
-
-                    if let Poll::Ready(_) = me.delay.as_mut().poll(cx) {
-                        break;
-                    }
-                    // Err....
-                    // if Instant::now() > next_deadline {
-                    //     break;
-                    // }
-                }
+        let mut previous_value = None;
+        match this.stream.poll_next(cx) {
+            Poll::Ready(Some(value)) => {
+                previous_value = this.value.replace(value);
             }
-
-            *me.has_delayed = false;
+            Poll::Ready(None) => return Poll::Ready(None),
+            Poll::Pending => {}
         }
 
-        Poll::Ready(value)
+        match this.sampler.poll_next(cx) {
+            Poll::Ready(Some(_)) => Poll::Ready(Some(previous_value)),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }

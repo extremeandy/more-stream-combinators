@@ -14,11 +14,11 @@ pub trait MoreStreamExt: Stream {
         assert_stream::<<Self::Item as Stream>::Item, _>(stream)
     }
 
-    fn sample(self, duration: Duration) -> Sample<Self>
+    fn sample<S: Stream>(self, sampler: S) -> Sample<Self, S>
     where
         Self: Sized,
     {
-        let stream = sample(duration, self);
+        let stream = sample(self, sampler);
         assert_stream(stream)
     }
 }

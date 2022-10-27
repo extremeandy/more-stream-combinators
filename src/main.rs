@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     //     }
     // });
 
-    let rx1 = IntervalStream::new(tokio::time::interval(Duration::from_micros(500)));
+    let rx1 = IntervalStream::new(tokio::time::interval(Duration::from_micros(1010)));
     //let rx1 = stream::repeat(1).enumerate();
 
     // let (mut tx, rx) = mpsc::channel(16);
@@ -48,7 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     // });
 
     //let mut combined = rx.switch();
-    let mut combined = rx1.sample(Duration::from_millis(1)).boxed();
+    let sampler = IntervalStream::new(tokio::time::interval(Duration::from_millis(1)));
+    let mut combined = rx1.sample(sampler);
     //let mut combined = rx.zip(stream::repeat(5));
 
     //println!("{combined:?}");
