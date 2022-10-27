@@ -1,47 +1,75 @@
 use std::{
     task::{ready, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use core::pin::Pin;
-use futures::{channel::mpsc, stream::BoxStream, SinkExt, Stream, StreamExt};
+use futures::{
+    channel::mpsc,
+    stream::{self, BoxStream},
+    SinkExt, Stream, StreamExt,
+};
 use pin_project_lite::pin_project;
-use rx_parity::many;
+use rx_parity::switch::{self, MoreStreamExt};
+use tokio_stream::{wrappers::IntervalStream, StreamExt as TokioStreamExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
-    println!("Hello, world!");
+    // let (mut tx1, rx1) = mpsc::channel(100000);
+    // //let (mut tx2, rx2) = mpsc::channel(16);
 
-    let (mut tx1, rx1) = mpsc::channel(16);
-    let (mut tx2, rx2) = mpsc::channel(16);
+    // tokio::spawn(async move {
+    //     for i in 1..1000 {
+    //         tx1.send(i).await.unwrap();
+    //         tokio::time::sleep(Duration::from_micros(10)).await;
+    //     }
+    // });
 
-    tokio::spawn(async move {
-        for i in 1..10 {
-            tx1.send(i).await.unwrap();
-            tokio::time::sleep(Duration::from_millis(200)).await;
-        }
-    });
+    let rx1 = IntervalStream::new(tokio::time::interval(Duration::from_micros(500)));
+    //let rx1 = stream::repeat(1).enumerate();
 
-    tokio::spawn(async move {
-        for i in 10..15 {
-            tx2.send(i).await.unwrap();
-            tokio::time::sleep(Duration::from_millis(400)).await;
-        }
-    });
+    // let (mut tx, rx) = mpsc::channel(16);
 
-    let streams = vec![rx1, rx2];
-    let combined = many::combine_latest(streams);
+    // tokio::spawn(async move {
+    //     tx.send(rx1).await.unwrap();
+    //     tokio::time::sleep(Duration::from_millis(1500)).await;
 
-    println!("{combined:?}");
+    //     tx.send(rx2).await.unwrap();
+
+    //     tokio::spawn(async move {
+    //         for i in 1000..2000 {
+    //             tx2.send(i).await;
+    //             tokio::time::sleep(Duration::from_millis(250)).await;
+    //         }
+    //     });
+
+    //     tokio::time::sleep(Duration::from_millis(1000)).await;
+    //     drop(tx);
+    // });
+
+    //let mut combined = rx.switch();
+    let mut combined = rx1.sample(Duration::from_millis(1)).boxed();
+    //let mut combined = rx.zip(stream::repeat(5));
+
+    //println!("{combined:?}");
 
     // //rx1.chain(other)
     // //rx1.zip(other)
 
     // let mut combined = combine_latest(rx1, rx2).boxed();
 
-    // while let Some(t) = combined.next().await {
-    //     println!("{t:?}");
-    // }
+    'outer: loop {
+        let mut count = 0;
+        let deadline = Instant::now() + Duration::from_secs(1);
+        while let Some(t) = futures::StreamExt::next(&mut combined).await {
+            if Instant::now() >= deadline {
+                println!("count: {count}");
+                continue 'outer;
+            }
+            count += 1;
+            //println!("{t:?}");
+        }
+    }
 
     Ok(())
 }
