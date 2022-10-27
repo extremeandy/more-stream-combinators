@@ -1,5 +1,5 @@
 [package]
-name = "rx-parity"
+name = "more-stream-combinators"
 version = "0.1.0"
 edition = "2021"
 

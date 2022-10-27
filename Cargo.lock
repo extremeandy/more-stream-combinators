@@ -168,6 +168,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "more-stream-combinators"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "pin-project-lite",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "num_cpus"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -237,16 +247,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "rx-parity"
-version = "0.1.0"
-dependencies = [
- "futures",
- "pin-project-lite",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]

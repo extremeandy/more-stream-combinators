@@ -4,7 +4,7 @@ use std::{task::Poll, time::Duration};
 
 use crate::sample::{sample, Sample};
 
-pub trait MoreStreamExt: Stream {
+pub trait StreamExt: Stream {
     fn switch(self) -> SwitchStream<Self>
     where
         Self::Item: Stream,
@@ -23,7 +23,7 @@ pub trait MoreStreamExt: Stream {
     }
 }
 
-impl<T: Stream> MoreStreamExt for T {}
+impl<T: Stream> StreamExt for T {}
 
 pin_project! {
     #[must_use = "streams do nothing unless polled"]

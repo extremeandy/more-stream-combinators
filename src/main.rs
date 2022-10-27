@@ -9,8 +9,8 @@ use futures::{
     stream::{self, BoxStream},
     SinkExt, Stream, StreamExt,
 };
+use more_stream_combinators::switch::StreamExt as MyStreamExt;
 use pin_project_lite::pin_project;
-use rx_parity::switch::{self, MoreStreamExt};
 use tokio_stream::{wrappers::IntervalStream, StreamExt as TokioStreamExt};
 
 #[tokio::main]
@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
     //     }
     // });
 
-    let rx1 = IntervalStream::new(tokio::time::interval(Duration::from_micros(1010)));
+    let rx1 = IntervalStream::new(tokio::time::interval(Duration::from_micros(1000)));
     //let rx1 = stream::repeat(1).enumerate();
 
     // let (mut tx, rx) = mpsc::channel(16);
@@ -67,6 +67,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 println!("count: {count}");
                 continue 'outer;
             }
+            if let None = t {
+                println!("{t:?}");
+            }
+
             count += 1;
             //println!("{t:?}");
         }
