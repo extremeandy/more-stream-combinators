@@ -67,9 +67,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + 'static>> {
                 println!("count: {count}");
                 continue 'outer;
             }
-            if let None = t {
-                println!("{t:?}");
-            }
 
             count += 1;
             //println!("{t:?}");

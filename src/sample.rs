@@ -1,15 +1,10 @@
 //! Slow down a stream by enforcing a delay between items.
 
-use futures::future::BoxFuture;
-use futures::stream::{FuturesOrdered, FuturesUnordered};
-use futures::{ready, FutureExt, Stream, StreamExt};
+use futures::Stream;
 use pin_project_lite::pin_project;
-use std::future::Future;
 use std::marker::Unpin;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{self, Poll};
-use tokio::time::{Duration, Instant, Sleep};
 
 pub(super) fn sample<T, S>(stream: T, sampler: S) -> Sample<T, S>
 where
@@ -66,22 +61,25 @@ impl<T: Stream + Unpin, S> Sample<T, S> {
 }
 
 impl<T: Stream, S: Stream> Stream for Sample<T, S> {
-    type Item = Option<T::Item>;
+    type Item = T::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
 
-        let mut previous_value = None;
+        let mut prev_value = None;
         match this.stream.poll_next(cx) {
             Poll::Ready(Some(value)) => {
-                previous_value = this.value.replace(value);
+                prev_value = this.value.replace(value);
             }
             Poll::Ready(None) => return Poll::Ready(None),
             Poll::Pending => {}
         }
 
         match this.sampler.poll_next(cx) {
-            Poll::Ready(Some(_)) => Poll::Ready(Some(previous_value)),
+            Poll::Ready(Some(_)) => match prev_value {
+                Some(value) => Poll::Ready(Some(value)),
+                None => Poll::Pending,
+            },
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
